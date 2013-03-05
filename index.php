@@ -16,7 +16,7 @@
 */
 
 /**
-* PHP enhanced style sheets - Psst
+* PHP-ized Style Sheets - Piste
 * Script for combining, minifying and caching CSS-files.
 * Just use any PHP in the CSS-files: variables, expressions, functions...
 * Put variable and function declarations in config.php for automatic inclusion
