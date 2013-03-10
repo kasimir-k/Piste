@@ -16,50 +16,89 @@
 */
 
 /**
-* PHP-ized Style Sheets - Piste
+* Piste - PHP-ized Stylesheets
+*
 * Script for combining, minifying and caching CSS-files.
 * Just use any PHP in the CSS-files: variables, expressions, functions...
-* Put variable and function declarations in config.php for automatic inclusion
+* Use PHP-files for declaring varibles and functions.
+*
+* Specify with querystring what CSS- and PHP-files to include, or leave it out
+* to include all from current directory.
 */
 
+$css_includes = array(); // CSS-files for output
+$php_includes = array(); // PHP-files for configuration
 
-$components = array(); // the CSS-files
+// all CSS- and PHP-files in current directory are available, except index.php
+// glob orders them alphabetically
+$css_available = glob('*.css');
+$php_available = array_diff(glob('*.php'), array('index.php'));
+
+// options can be overridden in included PHP-files
+$options = array(
+	'include_component_names' => true,
+	'minify' => true);
+
+
 if (!empty($_SERVER['QUERY_STRING'])) {
-	// the component CSS-files comma separated in querystring
+	// the component files comma separated in querystring
 	$components = explode(',', $_SERVER['QUERY_STRING']);
-	for ($i = 0, $ii = count($components); $i < $ii; $i++) {
-		// components in querystring optionally postfixed with ".css"
-		if (substr($components[$i], -4) != '.css') {
-			$components[$i] .= '.css';
+	foreach ($components as $i) {
+		$found = false;
+		$ext = substr($i, -4);
+		if ($ext == '.css') {
+			if (in_array($i, $css_available)) {
+				$css_includes[] = $i;
+				$found = true;
+			}
 		}
-		// remove components that don't exist
-		if (!file_exists(__DIR__ . '/' . $components[$i])) {
-			unset($components[$i]);
+		else if ($ext == '.php') {
+			if (in_array($i, $php_available)) {
+				$php_includes[] = $i;
+				$found = true;
+			}
 		}
-	}
+		else { 
+			if (in_array($i . '.css', $css_available)) {
+				$css_includes[] = $i . '.css';
+				$found = true;
+			}
+			if (in_array($i . '.php', $php_available)) {
+				$php_includes[] = $i . '.php';
+				$found = true;
+			}
+		}
+		if (!$found) {
+			header('HTTP/1.1 404 Not Found');
+			exit();
+		}
+ 	}
 }
 else {
-	// if no components in querystring, use all in current directory
-	// in alphabetical order
-	$components = glob('*.css');
-}
-if (empty($components)) {
-	exit;
+	// if no querystring, include all available files
+	$css_includes = array_merge($css_includes, $css_available);
+	$php_includes = array_merge($php_includes, $php_available);
 }
 
-$config_file = __DIR__ . '/config.php';
-$cache_file = __DIR__ . '/.cache/' . implode('-', $components);
+$cache_file = 
+	__DIR__ . '/.cache/'
+	. implode('-', $php_includes)
+	. '-' 
+	. implode('-', $css_includes);
 
 if (file_exists($cache_file)) {
-	// rebuild the cache file if any of the CSS-files or config file
+	// rebuild the cache file if any of the files include
 	// is more recent than cache file
 	$cache_file_time = filemtime($cache_file);
 	$rebuild = false;
-	if (file_exists($config_file) && filemtime($config_file) > $cache_file_time) {
-		$rebuild = true;
+	foreach ($css_includes as $i) {
+		if (filemtime(__DIR__ . '/' . $i) > $cache_file_time) {
+			$rebuild = true;
+			break;
+		}
 	}
-	else {
-		foreach ($components as $i) {
+	if (!$rebuild) {		
+		foreach ($php_includes as $i) {
 			if (filemtime(__DIR__ . '/' . $i) > $cache_file_time) {
 				$rebuild = true;
 				break;
@@ -84,16 +123,12 @@ if (file_exists($cache_file)) {
 	unlink($cache_file);
 }
 
-// options may be overridden in config.php
-$options = array(
-	'include_component_names' => true,
-	'minify' => true);
-
-if (file_exists($config_file)) {
-	include $config_file;
+foreach ($php_includes as $i) {
+	include __DIR__ . '/' . $i;
 }
+
 ob_start();
-foreach ($components as $i) {
+foreach ($css_includes as $i) {
 	if ($options['include_component_names']) {
 		echo "/*!\n$i\n*/";
 	}
