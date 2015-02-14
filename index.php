@@ -80,11 +80,17 @@ else {
 	$php_includes = array_merge($php_includes, $php_available);
 }
 
+// make a hash of cache file name lest it get too long
 $cache_file = 
 	__DIR__ . '/.cache/'
-	. implode('-', $php_includes)
-	. '-' 
-	. implode('-', $css_includes);
+	. substr(
+		str_replace(
+			array('+', '/'), // '+' and '/' are not good in filenames,
+			array('-', '_'), // repalce them with '-' and '_'
+			base64_encode(
+				hash('sha512', 	implode($php_includes) . implode($css_includes), true)
+			)
+		), 0, -2); // 512 bit makes '==' at the tail	
 
 if (file_exists($cache_file)) {
 	// rebuild the cache file if any of the files include
@@ -137,7 +143,7 @@ foreach ($css_includes as $i) {
 $css = ob_get_contents();
 ob_end_clean();
 
-// fairly conservative minification
+// fairly conservative minification	
 if ($options['minify']) {
 	$css = trim($css);
 	$css = str_replace("\r\n", "\n", $css);
